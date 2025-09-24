@@ -386,6 +386,28 @@ static void FDCAN_Config(void) {
 }
 
 /**
+ * @brief  FDCAN DataLength 코드를 실제 바이트 수로 변환
+ * @param  DataLength FDCAN_RxHeaderTypeDef의 DataLength 필드
+ * @retval uint8_t 실제 데이터 바이트 수 (0-8)
+ */
+static uint8_t DLC_decoder(uint32_t DataLength)
+{
+    switch(DataLength)
+    {
+        case FDCAN_DLC_BYTES_0: return 0;
+        case FDCAN_DLC_BYTES_1: return 1;
+        case FDCAN_DLC_BYTES_2: return 2;
+        case FDCAN_DLC_BYTES_3: return 3;
+        case FDCAN_DLC_BYTES_4: return 4;
+        case FDCAN_DLC_BYTES_5: return 5;
+        case FDCAN_DLC_BYTES_6: return 6;
+        case FDCAN_DLC_BYTES_7: return 7;
+        case FDCAN_DLC_BYTES_8: return 8;
+        default: return 0;
+    }
+}
+
+/**
  * @brief FDCAN1 인터럽트 수신받은 걸 LPUART로 전송
  */
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
@@ -397,15 +419,16 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             Error_Handler();
         }
 
-        char tx_buf[100]; // UART 전송을 위한 버퍼
+        static char tx_buf[100]; // UART 전송을 위한 버퍼
         int len = 0; // 버퍼에 쓰여진 길이
+        uint8_t dlc = DLC_decoder(RxHeader.DataLength); // DLC 값을 바이트 수로 변환
 
         // "ID: 0x123, DLC: 8, Data: " 부분 생성
-        len += sprintf(tx_buf + len, "ID: %#04lX, DLC: %lu, Data: ",
-                       (unsigned long)RxHeader.Identifier, (unsigned long)((RxHeader.DataLength >> 16) & 0xF));
+        len += sprintf(tx_buf + len, "ID: %#04lX, DLC: %u, Data: ",
+                       (unsigned long)RxHeader.Identifier, (unsigned int)dlc);
 
         // 수신된 데이터를 16진수 문자열로 변환
-        for (int i = 0; i < ((RxHeader.DataLength >> 16) & 0xF); i++)
+        for (int i = 0; i < dlc; i++)
         {
             len += sprintf(tx_buf + len, "%02X ", CANRxData[i]);
         }
